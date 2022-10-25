@@ -148,14 +148,14 @@ fn parse_log_entry(data: &[u8]) -> Result<Entry, LogError> {
     }
 }
 
-fn parse_log_size<T: AsRef<str>>(text: T) -> Result<usize, LogError> {
+fn read_log_size<T: AsRef<str>>(text: T) -> Result<usize, LogError> {
     let Tree { tree_size } = serde_json::from_str(text.as_ref())
         .map_err(|_| LogError::Parse("invalid log response when getting tree size!"))?;
 
     Ok(tree_size)
 }
 
-fn parse_log_entries<T: AsRef<str>>(text: T) -> Result<Vec<Entry>, LogError> {
+fn read_log_entries<T: AsRef<str>>(text: T) -> Result<Vec<Entry>, LogError> {
     let TreeResponse { entries } = serde_json::from_str(text.as_ref())
         .map_err(|_| LogError::Parse("invalid log response when getting entries!"))?;
 
@@ -165,7 +165,7 @@ fn parse_log_entries<T: AsRef<str>>(text: T) -> Result<Vec<Entry>, LogError> {
 
     for TreeEntry { leaf_input } in entries {
         let data = base64::decode(leaf_input).map_err(|_| {
-            LogError::Parse("when decoding leaf input!")
+            LogError::Parse("failed decoding leaf input!")
         })?;
 
         processed.push(self::parse_log_entry(data.as_slice())?);
@@ -181,32 +181,25 @@ where E: AsRef<str> {
         StreamError::InvalidEndpoint
     })?;
 
-    url.path_segments_mut().map_err(|_| {
-        StreamError::InvalidEndpoint
-    })?.push("/ct/v1/get-sth");
+    url.path_segments_mut()
+        .map_err(|_| StreamError::InvalidEndpoint)?
+        .push("/ct/v1/get-sth");
 
-    let text = loop {
+    let response = client.get(url.as_ref())
+        .send().map_err(|_| StreamError::Connection("failed requesting tree data!"))?;
+    
+    if response.status()
+        .is_success() {
 
-        let response = client.get(url.as_ref())
-            .send().map_err(|_| StreamError::Connection("when requesting tree size!"))?;
-        
-        if response.status()
-            .is_success() {
+            let text = response.text()
+                .map_err(|_| StreamError::Response("failed reading text!"))?;
+            
+            return Ok(self::read_log_size(text).map_err(|error| {
+                StreamError::Parse(error)
+            })?)
+        }
 
-                break response.text()
-                    .map_err(|_| StreamError::Response("when getting text!"))?
-            }
-
-        std::thread::sleep({
-            Duration::from_millis(1000)
-        });
-    };
-
-
-
-    Ok(self::parse_log_size(text).map_err(|error| {
-        StreamError::Parse(error)
-    })?)
+    Err(StreamError::Response("failed reading log size!"))
 }
 
 pub(crate) fn get_log_entries<E>(client: &Client, endpoint: E, position: usize, count: usize) -> Result<Vec<Entry>, StreamError> 
@@ -221,15 +214,15 @@ where E: AsRef<str> {
 
     let response = client.get(url.as_ref())
         .query([("start", position), ("end", position + count)].as_ref())
-        .send().map_err(|_| StreamError::Connection("when requesting entries!"))?;
+        .send().map_err(|_| StreamError::Connection("failed requesting entries!"))?;
 
     if response.status()
         .is_success() {
 
             let text = response.text()
-                .map_err(|_| StreamError::Response("when getting text!"))?;
+                .map_err(|_| StreamError::Response("failed reading text!"))?;
 
-            return Ok(self::parse_log_entries(text).map_err(|error| {
+            return Ok(self::read_log_entries(text).map_err(|error| {
                 StreamError::Parse(error)
             })?)
         }
