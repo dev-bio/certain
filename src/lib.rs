@@ -1,4 +1,4 @@
-//! Utility for listening to certificate transparency logs.
+//! Lightweight utility for listening to certificate transparency logs.
 //!
 //! ## Example
 //! ```

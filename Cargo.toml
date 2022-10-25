@@ -3,17 +3,17 @@ name = "certain"
 version = "0.1.0"
 authors = ["André Storfjord Kristiansen"]
 description = "Certificate transparency log streamer."
-repository = "https://github.com/dev-bio/ekko"
-homepage = "https://github.com/dev-bio/ekko"
+repository = "https://github.com/dev-bio/certain"
+homepage = "https://github.com/dev-bio/certain"
 readme = "README.md"
 license = "MIT"
 edition = "2021"
 
 keywords = [
-    "x509",
-    "rfc6962",
     "certificate",
+    "rfc6962",
     "stream",
+    "x509",
     "log",
 ]
 
