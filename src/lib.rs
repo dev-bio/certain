@@ -36,7 +36,7 @@ pub use error::{StreamError};
 
 pub struct StreamConfig<E: AsRef<str>> {
     pub endpoint: E,
-    pub timeout: Duration,
+    pub timeout: Option<Duration>,
     pub index: Option<usize>,
 }
 
@@ -45,7 +45,7 @@ impl <E: AsRef<str>> StreamConfig<E> {
         StreamConfig { 
 
             endpoint: endpoint, 
-            timeout: Duration::from_secs(1),
+            timeout: Some(Duration::from_secs(1)),
             index: None, 
         }
     }
@@ -53,7 +53,7 @@ impl <E: AsRef<str>> StreamConfig<E> {
     pub fn timeout(self, timeout: Duration) -> Self {
         StreamConfig { 
             endpoint: self.endpoint, 
-            timeout: timeout, 
+            timeout: Some(timeout), 
             index: self.index,
         }
     }
@@ -90,7 +90,9 @@ where E: AsRef<str>, F: FnMut(Entry) -> bool {
         let entries = certificate_log::get_log_entries(&client, endpoint.as_ref(), current, 10000)?;
 
         if entries.is_empty() {
-            std::thread::sleep(timeout);
+            if let Some(timeout) = timeout {
+                std::thread::sleep(timeout);
+            }
         }
 
         else {
