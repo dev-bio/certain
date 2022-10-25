@@ -1,0 +1,40 @@
+[package]
+name = "certain"
+version = "0.1.0"
+authors = ["André Storfjord Kristiansen"]
+description = "Certificate transparency log streamer."
+repository = "https://github.com/dev-bio/ekko"
+homepage = "https://github.com/dev-bio/ekko"
+readme = "README.md"
+license = "MIT"
+edition = "2021"
+
+keywords = [
+    "x509",
+    "rfc6962",
+    "certificate",
+    "stream",
+    "log",
+]
+
+exclude = [
+    ".gitattributes",
+    ".gitignore",
+    ".git",
+    
+    ".vscode/**",
+    ".github/**", 
+    ".cargo/**",
+
+    "media/**",
+]
+
+[dependencies]
+reqwest = { version = "0.11.11", features = ["blocking"] }
+serde = { version = "1.0.143", features = ["derive"] }
+serde_json = { version = "1.0.83" }
+x509-parser = { version = "0.14.0" }
+byteorder = { version = "1.4.3" }
+base64 = { version = "0.13.0" }
+chrono = { version = "0.4.22", features = ["serde"] }
+thiserror = { version = "1.0.34" }
