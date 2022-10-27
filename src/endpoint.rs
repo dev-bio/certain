@@ -1,4 +1,5 @@
 use std::io::{Cursor};
+use std::fmt::{Debug};
 
 use byteorder::{
     
@@ -33,7 +34,7 @@ use crate::{
 
 use reqwest::{
 
-    blocking::{Client},
+    Client,
     Url, 
 };
 
@@ -172,8 +173,8 @@ fn read_log_entries<T: AsRef<str>>(text: T) -> Result<Vec<Entry>, LogError> {
     Ok(processed)
 }
 
-pub(crate) fn get_log_size<E>(client: &Client, endpoint: E) -> Result<usize, StreamError> 
-where E: AsRef<str> {
+pub(crate) async fn get_log_size<E>(client: Client, endpoint: E) -> Result<usize, StreamError> 
+where E: AsRef<str> + Clone + Debug {
 
     let mut url = Url::parse(endpoint.as_ref()).map_err(|_| {
         StreamError::InvalidEndpoint
@@ -184,13 +185,13 @@ where E: AsRef<str> {
         .push("/ct/v1/get-sth");
 
     let response = client.get(url.as_ref())
-        .send().map_err(|_| StreamError::Connection("failed requesting tree data!"))?;
+        .send().await.map_err(|_| StreamError::Connection("failed requesting tree data!"))?;
     
     if response.status()
         .is_success() {
 
             let text = response.text()
-                .map_err(|_| StreamError::Response("failed reading text!"))?;
+                .await.map_err(|_| StreamError::Response("failed reading text!"))?;
             
             return Ok(self::read_log_size(text).map_err(|error| {
                 StreamError::Parse(error)
@@ -200,10 +201,10 @@ where E: AsRef<str> {
     Err(StreamError::Response("failed reading log size!"))
 }
 
-pub(crate) fn get_log_entries<E>(client: &Client, endpoint: E, position: usize, count: usize) -> Result<Vec<Entry>, StreamError> 
-where E: AsRef<str> {
+pub(crate) async fn get_log_entries<U>(client: Client, url: U, position: usize, count: usize) -> Result<Vec<Entry>, StreamError> 
+where U: AsRef<str> {
 
-    let mut url = Url::parse(endpoint.as_ref())
+    let mut url = Url::parse(url.as_ref())
         .map_err(|_| StreamError::InvalidEndpoint)?;
 
     url.path_segments_mut()
@@ -212,13 +213,13 @@ where E: AsRef<str> {
 
     let response = client.get(url.as_ref())
         .query([("start", position), ("end", position + count)].as_ref())
-        .send().map_err(|_| StreamError::Connection("failed requesting entries!"))?;
+        .send().await.map_err(|_| StreamError::Connection("failed requesting entries!"))?;
 
     if response.status()
         .is_success() {
 
             let text = response.text()
-                .map_err(|_| StreamError::Response("failed reading text!"))?;
+                .await.map_err(|_| StreamError::Response("failed reading text!"))?;
 
             return Ok(self::read_log_entries(text).map_err(|error| {
                 StreamError::Parse(error)

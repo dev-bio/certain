@@ -34,8 +34,10 @@ x509-parser = { version = "0.14.0" }
 serde_json = { version = "1.0.83" }
 thiserror = { version = "1.0.34" }
 byteorder = { version = "1.4.3" }
+num_cpus = { version = "1.13.1" }
 reqwest = { version = "0.11.11", features = ["blocking"] }
+futures = { version = "0.3.25" }
 chrono = { version = "0.4.22", features = ["serde"] }
 base64 = { version = "0.13.0" }
 serde = { version = "1.0.143", features = ["derive"] }
-rayon = { version = "1.5.3" }
+tokio = { version = "1.21.2" }

@@ -22,6 +22,8 @@ pub enum StreamError {
     Connection(&'static str),
     #[error("Response error, info: {0}")]
     Response(&'static str),
+    #[error("Concurrency error, info: {0}")]
+    Concurrency(&'static str),
     #[error("Parse error.")]
     Parse(LogError),
 }
