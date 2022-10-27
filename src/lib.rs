@@ -138,9 +138,7 @@ where E: AsRef<str> + Debug, F: FnMut(Entry) -> Option<R> {
                         let entries = certificate_log::get_log_entries(&client, endpoint, start, count)?;
 
                         if entries.is_empty() {
-                            if let Some(timeout) = timeout {
-                                std::thread::sleep(timeout);
-                            }
+                            return Ok(collection)
                         }
 
                         else {
@@ -163,6 +161,14 @@ where E: AsRef<str> + Debug, F: FnMut(Entry) -> Option<R> {
 
                     Ok(entries) => {
 
+                        if entries.is_empty() { 
+                            if let Some(timeout) = timeout {
+                                std::thread::sleep(timeout);
+                            }
+
+                            break
+                        }
+                        
                         position = position + {
                             entries.len()
                         };
