@@ -8,8 +8,6 @@ pub enum LogError {
     UnsupportedLeaf(u8),
     #[error("Unsupported entry, got: {0}")]
     UnsupportedEntry(u16),
-    #[error("Unsupported chain entry, got: {0}")]
-    UnsupportedChainEntry(u16),
     #[error("Parsing failed, info: {0}")]
     Parse(&'static str),
 }

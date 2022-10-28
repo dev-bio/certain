@@ -43,9 +43,7 @@ fn main() -> Result<(), StreamError> {
     certain::stream(config, |entry| {
         println!("{entry:#?}");
         true
-    })?;
-
-    Ok(())
+    })
 }
 ```
 

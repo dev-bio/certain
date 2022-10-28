@@ -55,9 +55,9 @@ where U: AsRef<str> + Clone + Debug {
     pub fn new(url: U) -> Self {
         StreamConfig { 
 
-            timeout: Some(Duration::from_secs(1)),
+            timeout: None,
             index: None, 
-            batch: Some(1000),
+            batch: None,
             url, 
         }
     }
@@ -91,7 +91,7 @@ where U: AsRef<str> + Clone + Debug {
 }
 
 pub async fn stream<U, F>(config : StreamConfig<U>, mut handler: F) -> Result<(), StreamError>
-where U: AsRef<str> + Clone + Debug, F: FnMut(Entry) {
+where U: AsRef<str> + Clone + Debug, F: FnMut(Entry) -> bool {
 
     let StreamConfig { 
         timeout, 
@@ -107,12 +107,12 @@ where U: AsRef<str> + Clone + Debug, F: FnMut(Entry) {
 
     let size = endpoint::get_log_size(client.clone(), url.clone()).await?;
 
-    let batch = if let Some(batch) = batch { batch.max(1) } 
-        else { 100 };
-
-    let position = if let Some(index) = index { 
-        if index < size { index } else { size } 
-    } else { 0 };
+    let position = index.unwrap_or(size).min(size);
+    let batch = batch.unwrap_or(1000).max(1);
+    
+    let timeout = timeout.unwrap_or({
+        Duration::from_secs(1)
+    });
 
     let mut iterator = futures::stream::iter((position..)
         .step_by(batch)).map(|start| {
@@ -130,10 +130,10 @@ where U: AsRef<str> + Clone + Debug, F: FnMut(Entry) {
 
                     let entries = endpoint::get_log_entries(client.clone(), url.as_str(), start, count).await?;
 
-                    if entries.is_empty() {
-                        if let Some(timeout) = timeout {
-                            tokio::time::sleep(timeout).await
-                        }
+                    if entries.is_empty() { 
+                        tokio::time::sleep({
+                            timeout
+                        }).await;
                     }
 
                     else {
@@ -154,7 +154,9 @@ where U: AsRef<str> + Clone + Debug, F: FnMut(Entry) {
         }))??;
 
         for entry in entries {
-            handler(entry)
+            if handler(entry) { continue } else {
+                return Ok(())
+            }
         }
     }
 
@@ -174,7 +176,7 @@ pub mod blocking {
     use super::{Debug};
     
     pub fn stream<U, F>(config : StreamConfig<U>, handler: F) -> Result<(), StreamError>
-    where U: AsRef<str> + Clone + Debug, F: FnMut(Entry) {
+    where U: AsRef<str> + Clone + Debug, F: FnMut(Entry) -> bool {
 
         let runtime = Runtime::new().map_err(|_| StreamError::Concurrency({
             "failed to create runtime!"
