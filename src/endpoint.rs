@@ -92,21 +92,29 @@ fn parse_log_entry(data: &[u8]) -> Result<Entry, LogError> {
     let mut cursor = Cursor::new(data);
 
     let leaf_version = cursor.read_u8()
-        .map_err(|_| LogError::Parse("failed to read leaf version!"))?;
+        .map_err(|_| LogError::Parse({
+            "reading leaf version!"
+        }))?;
 
     let leaf_variant = cursor.read_u8()
-        .map_err(|_| LogError::Parse("failed to read leaf variant!"))?;
+        .map_err(|_| LogError::Parse({
+            "reading leaf variant!"
+        }))?;
 
     let timestamp = {
 
         let raw = cursor.read_u64::<BigEndian>()
-            .map_err(|_| LogError::Parse("failed to read leaf timestamp!"))?;
+            .map_err(|_| LogError::Parse({
+                "reading leaf timestamp!"
+            }))?;
 
         NaiveDateTime::from_timestamp((raw / 1000) as i64, 0)
     };
 
     let leaf_entry_variant = cursor.read_u16::<BigEndian>()
-        .map_err(|_| LogError::Parse("failed to read leaf entry variant!"))?;
+        .map_err(|_| LogError::Parse({
+            "reading leaf entry variant!"
+        }))?;
 
     match leaf_version {
         0 => match leaf_variant {
@@ -121,13 +129,17 @@ fn parse_log_entry(data: &[u8]) -> Result<Entry, LogError> {
                 };
 
                 let length = cursor.read_u24::<BigEndian>()
-                    .map_err(|_| LogError::Parse("failed to read certificate length!"))?;
+                    .map_err(|_| LogError::Parse({
+                        "read certificate length!"
+                    }))?;
 
                 let start = cursor.position() as usize;
                 let end = start + length as usize;
 
                 let certificate = certificate::parse_certificate(data[start..end].as_ref())
-                    .ok_or(LogError::Parse("failed to parse certificate!"))?;
+                    .ok_or(LogError::Parse({
+                        "parse certificate!"
+                    }))?;
                 
                 Ok(match leaf_entry_variant {
                     0 => Entry::Signed {
@@ -149,23 +161,28 @@ fn parse_log_entry(data: &[u8]) -> Result<Entry, LogError> {
 
 fn read_log_size<T: AsRef<str>>(text: T) -> Result<usize, LogError> {
     let Tree { tree_size } = serde_json::from_str(text.as_ref())
-        .map_err(|_| LogError::Parse("invalid log response when getting tree size!"))?;
+        .map_err(|_| LogError::Parse({
+            "invalid log response!"
+        }))?;
 
     Ok(tree_size)
 }
 
 fn read_log_entries<T: AsRef<str>>(text: T) -> Result<Vec<Entry>, LogError> {
     let TreeResponse { entries } = serde_json::from_str(text.as_ref())
-        .map_err(|_| LogError::Parse("invalid log response when getting entries!"))?;
+        .map_err(|_| LogError::Parse({
+            "invalid log response!"
+        }))?;
 
     let mut processed = Vec::with_capacity({
         entries.len()
     });
 
     for TreeEntry { leaf_input } in entries {
-        let data = base64::decode(leaf_input).map_err(|_| {
-            LogError::Parse("failed decoding leaf input!")
-        })?;
+        let data = base64::decode(leaf_input)
+            .map_err(|_| LogError::Parse({
+                "invalid leaf!"
+            }))?;
 
         processed.push(self::parse_log_entry(data.as_slice())?);
     }
@@ -185,20 +202,26 @@ where E: AsRef<str> + Clone + Debug {
         .push("/ct/v1/get-sth");
 
     let response = client.get(url.as_ref())
-        .send().await.map_err(|_| StreamError::Connection("failed requesting tree data!"))?;
+        .send().await.map_err(|_| StreamError::Connection({
+            "requesting tree data!"
+        }))?;
     
     if response.status()
         .is_success() {
 
             let text = response.text()
-                .await.map_err(|_| StreamError::Response("failed reading text!"))?;
+                .await.map_err(|_| StreamError::Response({
+                    "reading response text!"
+                }))?;
             
             return Ok(self::read_log_size(text).map_err(|error| {
                 StreamError::Parse(error)
             })?)
         }
 
-    Err(StreamError::Response("failed reading log size!"))
+    Err(StreamError::Response({
+        "reading log size!"
+    }))
 }
 
 pub(crate) async fn get_log_entries<U>(client: Client, url: U, position: usize, count: usize) -> Result<Vec<Entry>, StreamError> 
@@ -213,13 +236,17 @@ where U: AsRef<str> {
 
     let response = client.get(url.as_ref())
         .query([("start", position), ("end", position + count)].as_ref())
-        .send().await.map_err(|_| StreamError::Connection("failed requesting entries!"))?;
+        .send().await.map_err(|_| StreamError::Connection({
+            "requesting entries!"
+        }))?;
 
     if response.status()
         .is_success() {
 
             let text = response.text()
-                .await.map_err(|_| StreamError::Response("failed reading text!"))?;
+                .await.map_err(|_| StreamError::Response({
+                    "reading response text!"
+                }))?;
 
             return Ok(self::read_log_entries(text).map_err(|error| {
                 StreamError::Parse(error)

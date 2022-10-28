@@ -1,4 +1,4 @@
-//! Lightweight utility for listening to certificate transparency logs.
+//! Client for listening to certificate transparency logs.
 //!
 //! ## Example
 //! ```
@@ -12,11 +12,13 @@
 //! 
 //! fn main() -> Result<(), StreamError> {
 //!     let config = StreamConfig::new("https://ct.googleapis.com/logs/argon2022/")
-//!         .timeout(Duration::from_secs(1));
+//!         .timeout(Duration::from_secs(1))
+//!         .workers(4)
+//!         .batch(1);
 //! 
 //!     certain::blocking::stream(config, |entry| {
 //!         println!("{entry:#?}");
-//!         true // Continue!
+//!         true // continue
 //!     })
 //! }
 //! ```

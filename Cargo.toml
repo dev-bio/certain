@@ -1,6 +1,6 @@
 [package]
 name = "certain"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["André Storfjord Kristiansen"]
 description = "Certificate transparency log streamer."
 repository = "https://github.com/dev-bio/certain"
