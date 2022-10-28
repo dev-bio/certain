@@ -16,9 +16,8 @@
 //! 
 //!     certain::blocking::stream(config, |entry| {
 //!         println!("{entry:#?}");
-//!     })?;
-//! 
-//!     Ok(())
+//!         true // Continue!
+//!     })
 //! }
 //! ```
 
@@ -45,6 +44,7 @@ pub use error::{StreamError};
 pub struct StreamConfig<U>
 where U: AsRef<str> + Clone + Debug {
     pub timeout: Option<Duration>,
+    pub workers: Option<usize>,
     pub index: Option<usize>,
     pub batch: Option<usize>,
     pub url: U,
@@ -56,6 +56,7 @@ where U: AsRef<str> + Clone + Debug {
         StreamConfig { 
 
             timeout: None,
+            workers: None,
             index: None, 
             batch: None,
             url, 
@@ -65,6 +66,17 @@ where U: AsRef<str> + Clone + Debug {
     pub fn timeout(self, timeout: Duration) -> Self {
         StreamConfig { 
             timeout: Some(timeout), 
+            workers: None,
+            index: self.index,
+            batch: self.batch,
+            url: self.url, 
+        }
+    }
+
+    pub fn workers(self, workers: usize) -> Self {
+        StreamConfig { 
+            timeout: None,
+            workers: Some(workers),
             index: self.index,
             batch: self.batch,
             url: self.url, 
@@ -74,6 +86,7 @@ where U: AsRef<str> + Clone + Debug {
     pub fn index(self, index: usize) -> Self {
         StreamConfig { 
             timeout: self.timeout, 
+            workers: None,
             index: Some(index),
             batch: self.batch,
             url: self.url, 
@@ -83,6 +96,7 @@ where U: AsRef<str> + Clone + Debug {
     pub fn batch(self, batch: usize) -> Self {
         StreamConfig { 
             timeout: self.timeout, 
+            workers: None,
             index: self.index,
             batch: Some(batch),
             url: self.url, 
@@ -95,6 +109,7 @@ where U: AsRef<str> + Clone + Debug, F: FnMut(Entry) -> bool {
 
     let StreamConfig { 
         timeout, 
+        workers,
         index,
         batch,
         url, 
@@ -108,6 +123,7 @@ where U: AsRef<str> + Clone + Debug, F: FnMut(Entry) -> bool {
     let size = endpoint::get_log_size(client.clone(), url.clone()).await?;
 
     let position = index.unwrap_or(size).min(size);
+    let workers = workers.unwrap_or(num_cpus::get()).max(1);
     let batch = batch.unwrap_or(1000).max(1);
     
     let timeout = timeout.unwrap_or({
@@ -146,7 +162,7 @@ where U: AsRef<str> + Clone + Debug, F: FnMut(Entry) -> bool {
 
                 Ok(collection)
             })
-        }).buffered(num_cpus::get());
+        }).buffered(workers);
 
     while let Some(result) = iterator.next().await {
         let entries = result.map_err(|_| StreamError::Concurrency({
