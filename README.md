@@ -4,7 +4,7 @@
 
 __Certificate Transparency Log Utility__
 
-[![dependency status](https://deps.rs/crate/certain/0.1.1/status.svg)](https://deps.rs/crate/certain/0.1.1)
+[![dependency status](https://deps.rs/crate/certain/0.2.0/status.svg)](https://deps.rs/crate/certain/0.2.0)
 [![Documentation](https://docs.rs/certain/badge.svg)](https://docs.rs/certain)
 [![License](https://img.shields.io/crates/l/certain.svg)](https://choosealicense.com/licenses/mit/)
 
@@ -19,7 +19,7 @@ To use `certain`, add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-certain = "0.1.1"
+certain = "0.2.0"
 ```
 
 ## Example
@@ -42,7 +42,7 @@ fn main() -> Result<(), StreamError> {
 
     certain::stream(config, |entry| {
         println!("{entry:#?}");
-        true
+        true // continue
     })
 }
 ```

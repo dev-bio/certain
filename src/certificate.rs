@@ -17,6 +17,8 @@ use chrono::{
     Utc,
 };
 
+use deepsize::{DeepSizeOf};
+
 use serde::{
 
     Deserialize, 
@@ -31,7 +33,7 @@ use x509_parser::prelude::{
     FromDer,
 };
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy, Debug, DeepSizeOf)]
 #[derive(Serialize, Deserialize)]
 pub struct CertificateValidity {
     begin: DateTime<Utc>,
@@ -77,7 +79,7 @@ impl<'a> CertificateValidity {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug, DeepSizeOf)]
 #[derive(Serialize, Deserialize)]
 pub enum CertificateAlternateName {
     Directory(String),
@@ -109,7 +111,7 @@ impl<'a> CertificateAlternateName {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, DeepSizeOf)]
 #[derive(Serialize, Deserialize)]
 pub struct Certificate {
     pub(crate) issuer: Option<String>,
@@ -158,7 +160,11 @@ impl<'a> Certificate {
         self.validity
     }
 
-    pub fn raw(&'a self) -> &'a [u8] {
+    pub fn deep_size(&'a self) -> usize {
+        self.deep_size_of()
+    }
+
+    pub fn encoded(&'a self) -> &'a [u8] {
         self.encoded.as_slice()
     }
 }

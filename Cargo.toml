@@ -1,6 +1,6 @@
 [package]
 name = "certain"
-version = "0.1.1"
+version = "0.2.0"
 authors = ["André Storfjord Kristiansen"]
 description = "Certificate transparency log streamer."
 repository = "https://github.com/dev-bio/certain"
@@ -31,14 +31,15 @@ exclude = [
 
 [dependencies]
 x509-parser = { version = "0.14.0" }
-serde_json = { version = "1.0.83" }
-thiserror = { version = "1.0.34" }
+serde_json = { version = "1.0.87" }
+thiserror = { version = "1.0.37" }
 byteorder = { version = "1.4.3" }
 num_cpus = { version = "1.13.1" }
-reqwest = { version = "0.11.11", features = ["blocking"] }
+reqwest = { version = "0.11.12", features = ["blocking"] }
 futures = { version = "0.3.25" }
 chrono = { version = "0.4.22", features = ["serde"] }
-base64 = { version = "0.13.0" }
-serde = { version = "1.0.143", features = ["derive"] }
+base64 = { version = "0.13.1" }
+serde = { version = "1.0.147", features = ["derive"] }
 tokio = { version = "1.21.2", features = ["time"] }
 url = "2.3.1"
+deepsize = { version = "0.2.0", features = ["chrono"] }

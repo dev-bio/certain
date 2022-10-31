@@ -243,7 +243,7 @@ pub mod blocking {
 
         StreamConfig, 
         StreamError, 
-        Entry
+        Entry,
     };
 
     use super::{Runtime};

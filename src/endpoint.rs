@@ -15,14 +15,15 @@ use chrono::{
     Utc,
 };
 
-use reqwest::header::HeaderMap;
+use reqwest::header::{HeaderMap};
+use deepsize::{DeepSizeOf};
+
 use serde::{
 
     Deserialize, 
     Serialize,
 };
 
-use crate::error::ResponseError;
 use crate::{
     
     certificate::{Certificate}, 
@@ -30,6 +31,7 @@ use crate::{
 
     error::{
         
+        ResponseError,
         StreamError,
         LogError,
         UrlError,
@@ -57,7 +59,7 @@ struct TreeResponse {
     entries: Vec<TreeEntry>
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug, DeepSizeOf)]
 #[derive(Serialize, Deserialize)]
 pub enum Entry {
 
