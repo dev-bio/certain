@@ -29,6 +29,7 @@ use std::{
     fmt::{Debug},
 };
 
+use endpoint::Response;
 use tokio::runtime::{Runtime};
 
 use futures::{StreamExt};
@@ -68,7 +69,7 @@ where U: AsRef<str> + Clone + Debug {
     pub fn timeout(self, timeout: Duration) -> Self {
         StreamConfig { 
             timeout: Some(timeout), 
-            workers: None,
+            workers: self.workers,
             index: self.index,
             batch: self.batch,
             url: self.url, 
@@ -77,7 +78,7 @@ where U: AsRef<str> + Clone + Debug {
 
     pub fn workers(self, workers: usize) -> Self {
         StreamConfig { 
-            timeout: None,
+            timeout: self.timeout,
             workers: Some(workers),
             index: self.index,
             batch: self.batch,
@@ -88,7 +89,7 @@ where U: AsRef<str> + Clone + Debug {
     pub fn index(self, index: usize) -> Self {
         StreamConfig { 
             timeout: self.timeout, 
-            workers: None,
+            workers: self.workers,
             index: Some(index),
             batch: self.batch,
             url: self.url, 
@@ -98,7 +99,7 @@ where U: AsRef<str> + Clone + Debug {
     pub fn batch(self, batch: usize) -> Self {
         StreamConfig { 
             timeout: self.timeout, 
-            workers: None,
+            workers: self.workers,
             index: self.index,
             batch: Some(batch),
             url: self.url, 
@@ -122,15 +123,40 @@ where U: AsRef<str> + Clone + Debug, F: FnMut(Entry) -> bool {
         url.as_ref()
     });
 
-    let size = endpoint::get_log_size(client.clone(), url.clone()).await?;
-
-    let position = index.unwrap_or(size).min(size);
     let workers = workers.unwrap_or(num_cpus::get()).max(1);
     let batch = batch.unwrap_or(1000).max(1);
-    
+
     let timeout = timeout.unwrap_or({
         Duration::from_secs(1)
     });
+
+    let size = loop {
+        
+        let response = endpoint::get_log_size(client.clone(), url.clone()).await?;
+
+        match response {
+
+            Response::Data(size) => {
+                break size
+            },
+
+            Response::Limited(Some(duration)) => {
+                tokio::time::sleep({
+                    duration
+                }).await;
+            },
+
+            Response::Limited(None) => {
+                tokio::time::sleep({
+                    timeout
+                }).await;
+            },
+
+            _ => continue,
+        }
+    };
+
+    let position = index.unwrap_or(size).min(size);
 
     let mut iterator = futures::stream::iter((position..)
         .step_by(batch)).map(|start| {
@@ -141,24 +167,46 @@ where U: AsRef<str> + Clone + Debug, F: FnMut(Entry) -> bool {
             tokio::spawn(async move {
                 let mut collection = Vec::with_capacity(batch);
                 
-                while collection.len() < batch {
+                loop {
 
                     let start = start + collection.len();
                     let count = batch - collection.len();
 
-                    let entries = endpoint::get_log_entries(client.clone(), url.as_str(), start, count).await?;
+                    let response = match endpoint::get_log_entries(client.clone(), url.as_str(), start, count).await {
+                        Err(error) => return Err(error),
+                        Ok(response) => response,
+                    };
 
-                    if entries.is_empty() { 
-                        tokio::time::sleep({
-                            timeout
-                        }).await;
-                    }
+                    match response {
 
-                    else {
+                        Response::Data(entries) => {
+                            if entries.is_empty() { 
+                                tokio::time::sleep({
+                                    timeout
+                                }).await;
+                            }
+        
+                            else {
+        
+                                collection.extend(entries);
+                                if collection.len() < batch { continue }
+                                    else { break }
+                            }
+                        },
 
-                        collection.extend(entries);
-                        if collection.len() < batch { continue }
-                            else { break }
+                        Response::Limited(Some(duration)) => {
+                            tokio::time::sleep({
+                                duration
+                            }).await;
+                        },
+
+                        Response::Limited(None) => {
+                            tokio::time::sleep({
+                                timeout
+                            }).await;
+                        },
+
+                        _ => continue,
                     }
                 }
 
@@ -167,11 +215,7 @@ where U: AsRef<str> + Clone + Debug, F: FnMut(Entry) -> bool {
         }).buffered(workers);
 
     while let Some(result) = iterator.next().await {
-        let entries = result.map_err(|_| StreamError::Concurrency({
-            "failed to join task!"
-        }))??;
-
-        for entry in entries {
+        for entry in result.map_err(|error| StreamError::Task(error))?? {
             if handler(entry) { continue } else {
                 return Ok(())
             }
@@ -196,9 +240,7 @@ pub mod blocking {
     pub fn stream<U, F>(config : StreamConfig<U>, handler: F) -> Result<(), StreamError>
     where U: AsRef<str> + Clone + Debug, F: FnMut(Entry) -> bool {
 
-        let runtime = Runtime::new().map_err(|_| StreamError::Concurrency({
-            "failed to create runtime!"
-        }))?;
+        let runtime = Runtime::new()?;
 
         runtime.block_on(async {
             super::stream(config, handler).await

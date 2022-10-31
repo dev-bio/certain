@@ -41,3 +41,4 @@ chrono = { version = "0.4.22", features = ["serde"] }
 base64 = { version = "0.13.0" }
 serde = { version = "1.0.143", features = ["derive"] }
 tokio = { version = "1.21.2", features = ["time"] }
+url = "2.3.1"
