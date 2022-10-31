@@ -226,7 +226,7 @@ where E: AsRef<str> + Clone + Debug {
 
             429 => {
 
-                Ok(Response::Limited(get_rate_timeout({
+                Ok(Response::Limited(self::get_rate_timeout({
                     response.headers()
                 })))
             },
@@ -234,7 +234,7 @@ where E: AsRef<str> + Clone + Debug {
             code => {
 
                 match code {
-                    400..=499 => return Err(ResponseError::Client(code).into()),
+                    401..=499 => return Err(ResponseError::Client(code).into()),
                     500..=599 => return Err(ResponseError::Server(code).into()),
                     code => Ok(Response::Unhandled(code)),
                 }
@@ -268,7 +268,7 @@ where U: AsRef<str> {
 
             429 => {
 
-                Ok(Response::Limited(get_rate_timeout({
+                Ok(Response::Limited(self::get_rate_timeout({
                     response.headers()
                 })))
             },
@@ -276,7 +276,7 @@ where U: AsRef<str> {
             code => {
 
                 match code {
-                    400..=499 => return Err(ResponseError::Client(code).into()),
+                    401..=499 => return Err(ResponseError::Client(code).into()),
                     500..=599 => return Err(ResponseError::Server(code).into()),
                     code => Ok(Response::Unhandled(code)),
                 }

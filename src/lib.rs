@@ -152,6 +152,12 @@ where U: AsRef<str> + Clone + Debug, F: FnMut(Entry) -> bool {
                 }).await;
             },
 
+            Response::Unhandled(400) => {
+                tokio::time::sleep({
+                    timeout
+                }).await;
+            },
+
             _ => continue,
         }
     };
@@ -201,6 +207,12 @@ where U: AsRef<str> + Clone + Debug, F: FnMut(Entry) -> bool {
                         },
 
                         Response::Limited(None) => {
+                            tokio::time::sleep({
+                                timeout
+                            }).await;
+                        },
+
+                        Response::Unhandled(400) => {
                             tokio::time::sleep({
                                 timeout
                             }).await;
