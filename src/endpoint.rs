@@ -2,6 +2,7 @@ use std::time::{Duration};
 use std::fmt::{Debug};
 use std::io::{Cursor};
 
+use base64::Engine;
 use byteorder::{
     
     ReadBytesExt,
@@ -15,8 +16,8 @@ use chrono::{
     Utc,
 };
 
+use certain_certificate::{Certificate};
 use reqwest::header::{HeaderMap};
-use deepsize::{DeepSizeOf};
 
 use serde::{
 
@@ -24,18 +25,12 @@ use serde::{
     Serialize,
 };
 
-use crate::{
-    
-    certificate::{Certificate}, 
-    certificate,
-
-    error::{
+use crate::error::{
         
-        ResponseError,
-        StreamError,
-        LogError,
-        UrlError,
-    },
+    ResponseError,
+    StreamError,
+    LogError,
+    UrlError,
 };
 
 use reqwest::{
@@ -59,38 +54,20 @@ struct TreeResponse {
     entries: Vec<TreeEntry>
 }
 
-#[derive(Clone, Debug, DeepSizeOf)]
+#[derive(Clone, Debug)]
 #[derive(Serialize, Deserialize)]
-pub enum Entry {
-
-    Signed {
-
-        timestamp: DateTime<Utc>,
-        certificate: Certificate,
-    },
-
-    Pending {
-
-        timestamp: DateTime<Utc>,
-        certificate: Certificate,
-    },
+pub struct Entry {
+    timestamp: DateTime<Utc>,
+    certificate: Certificate,
 }
 
 impl<'a> Entry {
     pub fn timestamp(&'a self) -> DateTime<Utc> {
-        match self {
-
-            Entry::Signed { ref timestamp, .. } => timestamp.clone(),
-            Entry::Pending { ref timestamp, .. } => timestamp.clone(),
-        }
+        self.timestamp.clone()
     }
 
     pub fn certificate(&'a self) -> &'a Certificate {
-        match self {
-
-            Entry::Signed { ref certificate, .. } => certificate,
-            Entry::Pending { ref certificate, .. } => certificate,
-        }
+        &(self.certificate)
     }
 }
 
@@ -108,7 +85,8 @@ fn parse_log_entry(data: &[u8]) -> Result<Entry, LogError> {
         let raw = cursor.read_u64::<BigEndian>()
             .map_err(|_| LogError::Parse("reading leaf timestamp!"))?;
 
-        NaiveDateTime::from_timestamp((raw / 1000) as i64, 0)
+        NaiveDateTime::from_timestamp_opt((raw / 1000) as i64, 0)
+            .unwrap_or_default()
     };
 
     let leaf_entry_variant = cursor.read_u16::<BigEndian>()
@@ -132,19 +110,12 @@ fn parse_log_entry(data: &[u8]) -> Result<Entry, LogError> {
                 let start = cursor.position() as usize;
                 let end = start + length as usize;
 
-                let certificate = certificate::parse_certificate(data[start..end].as_ref())
+                let certificate = Certificate::parse(data[start..end].as_ref())
                     .ok_or(LogError::Parse("parse certificate!"))?;
                 
-                Ok(match leaf_entry_variant {
-                    0 => Entry::Signed {
+                Ok(Entry {
                         timestamp: DateTime::from_utc(timestamp, Utc),
                         certificate,
-                    },
-                    1 => Entry::Pending { 
-                        timestamp: DateTime::from_utc(timestamp, Utc), 
-                        certificate,
-                    },
-                    _ => return Err(LogError::UnsupportedEntry(leaf_entry_variant)),
                 })
             },
             _ => Err(LogError::UnsupportedLeaf(leaf_variant)),
@@ -168,8 +139,10 @@ fn read_log_entries<T: AsRef<str>>(text: T) -> Result<Vec<Entry>, LogError> {
         entries.len()
     });
 
+    use base64::engine::general_purpose::{STANDARD_NO_PAD};
+
     for TreeEntry { leaf_input } in entries {
-        let data = base64::decode(leaf_input)
+        let data = STANDARD_NO_PAD.decode(leaf_input)
             .map_err(|_| LogError::Parse("invalid leaf encoding!"))?;
 
         processed.push(self::parse_log_entry(data.as_slice())?);

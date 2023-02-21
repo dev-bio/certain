@@ -11,7 +11,7 @@
 //! };
 //! 
 //! fn main() -> Result<(), StreamError> {
-//!     let config = StreamConfig::new("https://ct.googleapis.com/logs/argon2022/")
+//!     let config = StreamConfig::new("https://ct.googleapis.com/logs/argon2023/")
 //!         .timeout(Duration::from_secs(1))
 //!         .workers(4)
 //!         .batch(1);
@@ -35,7 +35,6 @@ use tokio::runtime::{Runtime};
 use futures::{StreamExt};
 use reqwest::{Client};
 
-pub mod certificate;
 pub mod error;
 
 mod endpoint;
