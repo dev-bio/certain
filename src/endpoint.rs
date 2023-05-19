@@ -1,8 +1,12 @@
 use std::time::{Duration};
 use std::fmt::{Debug};
-use std::io::{Cursor};
 
-use base64::Engine;
+use std::io::{
+
+    Cursor, 
+    Read,
+};
+
 use byteorder::{
     
     ReadBytesExt,
@@ -10,7 +14,7 @@ use byteorder::{
 };
 
 use chrono::{
-
+    
     NaiveDateTime,
     DateTime, 
     Utc,
@@ -18,6 +22,7 @@ use chrono::{
 
 use certain_certificate::{Certificate};
 use reqwest::header::{HeaderMap};
+use base64::{Engine};
 
 use serde::{
 
@@ -46,7 +51,8 @@ struct Tree {
 
 #[derive(Debug, Deserialize)]
 struct TreeEntry {
-    leaf_input: String
+    leaf_input: String,
+    extra_data: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -59,6 +65,7 @@ struct TreeResponse {
 pub struct Entry {
     timestamp: DateTime<Utc>,
     certificate: Certificate,
+    chain: Vec<Certificate>,
 }
 
 impl<'a> Entry {
@@ -69,9 +76,25 @@ impl<'a> Entry {
     pub fn certificate(&'a self) -> &'a Certificate {
         &(self.certificate)
     }
+
+    pub fn chain(&'a self) -> &'a [Certificate] {
+        self.chain.as_slice()
+    }
+
+    pub fn verify_trust_system_roots(&'a self) -> bool {
+        self.certificate().verify_trust_chain_system_roots(self.chain())
+    }
+
+    pub fn verify_trust_web_roots(&'a self) -> bool {
+        self.certificate().verify_trust_chain_web_roots(self.chain())
+    }
+
+    pub fn verify_trust(&'a self, roots: &[Certificate]) -> bool {
+        self.certificate().verify_trust_chain(self.chain(), roots)
+    }
 }
 
-fn parse_log_entry(data: &[u8]) -> Result<Entry, LogError> {
+fn parse_log_entry(data: &[u8], extra_data: &[u8]) -> Result<Entry, LogError> {
     let mut cursor = Cursor::new(data);
 
     let leaf_version = cursor.read_u8()
@@ -97,26 +120,99 @@ fn parse_log_entry(data: &[u8]) -> Result<Entry, LogError> {
             0 => {
 
                 match leaf_entry_variant {
-                    0 => cursor.set_position(cursor.position()),
-                    1 => cursor.set_position(cursor.position() + 32),
+                    0 => {
+
+                        // Get leaf certificate ..
+
+                        let length = cursor.read_u24::<BigEndian>()
+                            .map_err(|_| LogError::Parse("reading certificate length!"))?;
+
+                        let mut buffer = vec![0; length as usize];
+
+                        cursor.read(buffer.as_mut_slice())
+                            .map_err(|_| LogError::BufferRead("reading certificate buffer!"))?;
+
+                        let certificate = Certificate::parse(buffer.as_slice())
+                            .ok_or(LogError::Parse("parsing certificate!"))?;
+
+                        // Get certificate chain ..
+
+                        let mut cursor = Cursor::new(extra_data);
+                        let mut chain = Vec::new();
+
+                        let chain_end = cursor.position() + cursor.read_u24::<BigEndian>()
+                            .map_err(|_| LogError::Parse("reading certificate chain length!"))? as u64;
+
+                        while cursor.position() < chain_end {
+                            let length = cursor.read_u24::<BigEndian>()
+                                .map_err(|_| LogError::Parse("reading certificate chain entry length!"))?;
+
+                            let mut buffer = vec![0; length as usize];
+
+                            cursor.read(buffer.as_mut_slice())
+                                .map_err(|_| LogError::BufferRead("reading certificate chain entry buffer!"))?;
+    
+                            chain.push(Certificate::parse(buffer.as_slice())
+                                .ok_or(LogError::Parse("parsing certificate chain entry!"))?);
+                        }
+                        
+                        return Ok(Entry {
+                                timestamp: DateTime::from_utc(timestamp, Utc),
+                                certificate, chain,
+                        })
+                    },
+                    1 => {
+
+                        // Get leaf certificate ..
+                        
+                        cursor.set_position(cursor.position() + 32); // Skipping hash ..
+
+                        let length = cursor.read_u24::<BigEndian>()
+                            .map_err(|_| LogError::Parse("reading certificate length!"))?;
+
+                        let mut buffer = vec![0; length as usize];
+
+                        cursor.read(buffer.as_mut_slice())
+                            .map_err(|_| LogError::BufferRead("reading certificate buffer!"))?;
+
+                        let certificate = Certificate::parse(buffer.as_slice())
+                            .ok_or(LogError::Parse("parsing certificate!"))?;
+
+                        // Get certificate chain ..
+
+                        let mut cursor = Cursor::new(extra_data);
+                        let mut chain = Vec::new();
+
+                        let length = cursor.read_u24::<BigEndian>()
+                            .map_err(|_| LogError::Parse("reading certificate length!"))?;
+
+                        cursor.set_position(cursor.position() + length as u64); // Skipping leaf certificate ..
+
+                        let chain_end = cursor.position() + cursor.read_u24::<BigEndian>()
+                            .map_err(|_| LogError::Parse("reading certificate chain length!"))? as u64;
+
+                        while cursor.position() < chain_end {
+                            let length = cursor.read_u24::<BigEndian>()
+                                .map_err(|_| LogError::Parse("reading certificate chain entry length!"))?;
+
+                            let mut buffer = vec![0; length as usize];
+
+                            cursor.read(buffer.as_mut_slice())
+                                .map_err(|_| LogError::BufferRead("reading certificate chain entry buffer!"))?;
+    
+                            chain.push(Certificate::parse(buffer.as_slice())
+                                .ok_or(LogError::Parse("parsing certificate chain entry!"))?);
+                        }
+                        
+                        return Ok(Entry {
+                                timestamp: DateTime::from_utc(timestamp, Utc),
+                                certificate, chain,
+                        })
+                    },
                     _ => return Err(LogError::UnsupportedEntry({
                         leaf_entry_variant
                     })),
                 };
-
-                let length = cursor.read_u24::<BigEndian>()
-                    .map_err(|_| LogError::Parse("read certificate length!"))?;
-
-                let start = cursor.position() as usize;
-                let end = start + length as usize;
-
-                let certificate = Certificate::parse(data[start..end].as_ref())
-                    .ok_or(LogError::Parse("parse certificate!"))?;
-                
-                Ok(Entry {
-                        timestamp: DateTime::from_utc(timestamp, Utc),
-                        certificate,
-                })
             },
             _ => Err(LogError::UnsupportedLeaf(leaf_variant)),
         },
@@ -139,13 +235,16 @@ fn read_log_entries<T: AsRef<str>>(text: T) -> Result<Vec<Entry>, LogError> {
         entries.len()
     });
 
-    use base64::engine::general_purpose::{STANDARD_NO_PAD};
+    use base64::engine::general_purpose::{STANDARD};
 
-    for TreeEntry { leaf_input } in entries {
-        let data = STANDARD_NO_PAD.decode(leaf_input)
-            .map_err(|_| LogError::Parse("invalid leaf encoding!"))?;
+    for TreeEntry { leaf_input, extra_data } in entries {
+        let data = STANDARD.decode(leaf_input)
+            .map_err(|_| LogError::Parse("invalid data encoding!"))?;
 
-        processed.push(self::parse_log_entry(data.as_slice())?);
+        let extra_data = STANDARD.decode(extra_data)
+            .map_err(|_| LogError::Parse("invalid data encoding!"))?;
+
+        processed.push(self::parse_log_entry(data.as_slice(), extra_data.as_slice())?);
     }
 
     Ok(processed)

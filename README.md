@@ -4,7 +4,7 @@
 
 __Certificate Transparency Log Utility__
 
-[![dependency status](https://deps.rs/crate/certain/1.0.0/status.svg)](https://deps.rs/crate/certain/1.0.0)
+[![dependency status](https://deps.rs/crate/certain/1.1.0/status.svg)](https://deps.rs/crate/certain/1.1.0)
 [![Documentation](https://docs.rs/certain/badge.svg)](https://docs.rs/certain)
 [![License](https://img.shields.io/crates/l/certain.svg)](https://choosealicense.com/licenses/mit/)
 
@@ -19,7 +19,7 @@ To use `certain`, add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-certain = "1.0.0"
+certain = "1.1.0"
 ```
 
 ## Example

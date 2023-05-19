@@ -16,6 +16,8 @@ pub enum LogError {
     UnsupportedEntry(u16),
     #[error("Parsing failed, info: {0}")]
     Parse(&'static str),
+    #[error("Buffer read failed, info: {0}")]
+    BufferRead(&'static str),
 }
 
 #[derive(ThisError, Debug)]
