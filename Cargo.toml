@@ -40,5 +40,5 @@ futures = { version = "0.3.25" }
 chrono = { version = "0.4.22", features = ["serde"] }
 base64 = { version = "0.21.0" }
 serde = { version = "1.0.147", features = ["derive"] }
-tokio = { version = "1.25.0", features = ["time"] }
+tokio = { version = "1.25.0", features = ["time", "rt-multi-thread"] }
 url = "2.3.1"
